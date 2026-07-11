@@ -14,7 +14,11 @@ class User(AbstractUser):
     ]
 
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=15, blank=True)
+    phone = models.CharField(
+            max_length=15,
+            unique=True,
+            blank=True,
+            )
 
     role = models.CharField(
         max_length=20,
