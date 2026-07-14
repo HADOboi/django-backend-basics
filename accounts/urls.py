@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import SignupView, LogoutView, CandidateProfileAPIView, EmployerProfileAPIView
+from .views import SignupView, LogoutView, CandidateProfileAPIView, EmployerProfileAPIView, ResumeUploadAPIView
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -41,5 +41,11 @@ urlpatterns = [
         "employer/profile/",
         EmployerProfileAPIView.as_view(),
         name="employer-profile",
+    ),
+
+    path(
+        "candidate/upload-resume/",
+        ResumeUploadAPIView.as_view(),
+        name="upload-resume",
     ),
 ]

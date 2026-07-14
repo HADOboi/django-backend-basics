@@ -41,6 +41,11 @@ class CandidateProfile(models.Model):
         related_name="candidate_profile",
         
     )
+    resume = models.FileField(
+        upload_to="resumes/",
+        blank=True,
+        null=True
+    )
     skills = models.TextField(blank=True)
     education = models.TextField(blank=True)
     experience = models.TextField(blank=True)

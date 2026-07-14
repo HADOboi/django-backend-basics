@@ -10,6 +10,8 @@ from rest_framework import status
 from .models import CandidateProfile, EmployerProfile
 from .serializers import CandidateProfileSerializer, EmployerProfileSerializer
 
+import os
+
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -138,5 +140,57 @@ class EmployerProfileAPIView(APIView):
 
         return Response(
             {"message": "Employer profile deleted successfully"},
+            status=status.HTTP_200_OK
+        )
+
+
+class ResumeUploadAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            profile = CandidateProfile.objects.get(user=request.user)
+        except CandidateProfile.DoesNotExist:
+            return Response(
+                {"error": "Candidate profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if "resume" not in request.FILES:
+            return Response(
+                {"error": "No resume file uploaded."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        resume = request.FILES["resume"]
+
+        allowed_extensions = [".pdf", ".doc", ".docx"]
+        extension = os.path.splitext(resume.name)[1].lower()
+
+        if extension not in allowed_extensions:
+            return Response(
+                {"error": "Only PDF, DOC and DOCX files are allowed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        max_size = 5 * 1024 * 1024  # 5 MB
+
+        if resume.size > max_size:
+            return Response(
+                {"error": "File size must not exceed 5 MB."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if profile.resume:
+            profile.resume.delete(save=False)
+
+        profile.resume = resume
+        profile.save()
+
+        return Response(
+            {
+                "message": "Resume uploaded successfully.",
+                "resume": profile.resume.url,
+            },
             status=status.HTTP_200_OK
         )
