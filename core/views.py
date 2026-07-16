@@ -8,16 +8,35 @@ from .permissions import IsEmployer, IsCandidate, IsAdmin
 from .models import Job
 from .serializers import JobSerializer
 
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 
 class JobListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = JobSerializer
-    queryset = Job.objects.all()
+    queryset = Job.objects.select_related("employer")
 
-    def get(self, request):
-        jobs = Job.objects.all()
-        serializer = JobSerializer(jobs, many=True)
-        return Response(serializer.data)
+    filter_backends = [
+        DjangoFilterBackend,
+        SearchFilter,
+        OrderingFilter,
+    ]
+
+    filterset_fields = [
+        "job_type",
+        "location",
+        "title",
+    ]
+    search_fields = [
+        "title",
+        "description",
+        "location",
+    ]
+    ordering_fields = [
+        "created_at",
+        "title",
+        "salary",
+    ]
 
 
 class JobCreateAPIView(APIView):
