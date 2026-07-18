@@ -1,16 +1,17 @@
-from rest_framework import generics
-from .serializers import SignupSerializer
-from rest_framework.permissions import IsAuthenticated, AllowAny
+import os
 
+from rest_framework import generics, status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework import status
-from .models import CandidateProfile, EmployerProfile
-from .serializers import CandidateProfileSerializer, EmployerProfileSerializer
 
-import os
+from .models import CandidateProfile, EmployerProfile
+from .serializers import CandidateProfileSerializer, EmployerProfileSerializer, SignupSerializer
+from .services import (get_candidate_profile,get_employer_profile,)
+
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+ALLOWED_EXTENSIONS = (".pdf", ".doc", ".docx")
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
@@ -34,21 +35,20 @@ class CandidateProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            profile = CandidateProfile.objects.get(user=request.user)
-            serializer = CandidateProfileSerializer(profile)
-            return Response(serializer.data)
+        profile = get_candidate_profile(request.user)
 
-        except CandidateProfile.DoesNotExist:
+        if not profile:
             return Response(
                 {"message": "Candidate profile not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+        serializer = CandidateProfileSerializer(profile)
+        return Response(serializer.data)
 
     def put(self, request):
-        try:
-            profile = CandidateProfile.objects.get(user=request.user)
-        except CandidateProfile.DoesNotExist:
+        profile = get_candidate_profile(request.user)
+        if not profile:
             return Response(
                 {"message": "Profile not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -70,9 +70,8 @@ class CandidateProfileAPIView(APIView):
         )
 
     def delete(self, request):
-        try:
-            profile = CandidateProfile.objects.get(user=request.user)
-        except CandidateProfile.DoesNotExist:
+        profile = get_candidate_profile(request.user)
+        if not profile:
             return Response(
                 {"message": "Profile not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -91,21 +90,20 @@ class EmployerProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            profile = EmployerProfile.objects.get(user=request.user)
-            serializer = EmployerProfileSerializer(profile)
-            return Response(serializer.data)
+        profile = get_employer_profile(request.user)
 
-        except EmployerProfile.DoesNotExist:
+        if not profile:
             return Response(
                 {"message": "Employer profile not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+        serializer = EmployerProfileSerializer(profile)
+        return Response(serializer.data)
 
     def put(self, request):
-        try:
-            profile = EmployerProfile.objects.get(user=request.user)
-        except EmployerProfile.DoesNotExist:
+        profile = get_employer_profile(request.user)
+        if not profile:
             return Response(
                 {"message": "Employer profile not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -127,9 +125,8 @@ class EmployerProfileAPIView(APIView):
         )
 
     def delete(self, request):
-        try:
-            profile = EmployerProfile.objects.get(user=request.user)
-        except EmployerProfile.DoesNotExist:
+        profile = get_employer_profile(request.user)
+        if not profile:
             return Response(
                 {"message": "Employer profile not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -148,43 +145,52 @@ class ResumeUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        try:
-            profile = CandidateProfile.objects.get(user=request.user)
-        except CandidateProfile.DoesNotExist:
+        profile = get_candidate_profile(request.user)
+        if not profile:
             return Response(
-                {"error": "Candidate profile not found."},
+                {"message": "Candidate profile not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         if "resume" not in request.FILES:
             return Response(
-                {"error": "No resume file uploaded."},
+                {"message": "No resume file uploaded."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        resume = request.FILES["resume"]
+        uploaded_resume = request.FILES["resume"]
 
-        allowed_extensions = [".pdf", ".doc", ".docx"]
-        extension = os.path.splitext(resume.name)[1].lower()
+        ALLOWED_CONTENT_TYPES = (
+            "application/pdf", 
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
 
-        if extension not in allowed_extensions:
+        if uploaded_resume.content_type not  in ALLOWED_CONTENT_TYPES:
             return Response(
-                {"error": "Only PDF, DOC and DOCX files are allowed."},
+                {"message": "Invalid file type."},
+                status=status.HTTP_400_BAD_REQUEST,
+                
+            )
+
+        extension = os.path.splitext(uploaded_resume.name)[1].lower()
+
+        if extension not in ALLOWED_EXTENSIONS:
+            return Response(
+                {"message": "Only PDF, DOC and DOCX files are allowed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        max_size = 5 * 1024 * 1024  # 5 MB
-
-        if resume.size > max_size:
+        if uploaded_resume.size > MAX_FILE_SIZE:
             return Response(
-                {"error": "File size must not exceed 5 MB."},
+                {"message": "File size must not exceed 5 MB."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if profile.resume:
             profile.resume.delete(save=False)
 
-        profile.resume = resume
+        profile.resume = uploaded_resume
         profile.save()
 
         return Response(
