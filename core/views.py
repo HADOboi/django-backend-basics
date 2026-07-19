@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
 from .models import Job
-from .serializers import JobSerializer
+from .serializers import JobSerializer, JobStatusSerializer
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -35,22 +35,38 @@ class JobListAPIView(generics.ListAPIView):
     ordering_fields = [
         "created_at",
         "title",
-        "salary",
+        "salary_min",
+        "salary_max",
     ]
 
-
-class JobCreateAPIView(APIView):
+class JobCreateAPIView(generics.CreateAPIView):
+    serializer_class = JobSerializer
     permission_classes = [IsEmployer]
 
-    def post(self, request):
-        serializer = JobSerializer(data=request.data)
+    def perform_create(self, serializer):
+        serializer.save(
+            employer=self.request.user.employer_profile
+        )
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+class JobUpdateAPIView(generics.UpdateAPIView):
+    serializer_class = JobSerializer
+    permission_classes = [IsEmployer]
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get_queryset(self):
+        return Job.objects.filter(
+            employer=self.request.user.employer_profile
+        )
 
+class JobStatusAPIView(generics.UpdateAPIView):
+    serializer_class = JobStatusSerializer
+    permission_classes = [IsEmployer]
+
+    def get_queryset(self):
+        return Job.objects.filter(
+            employer=self.request.user.employer_profile
+        )
+#no need PATCh endpoint here because UpdateAPIView already
+#knows how to use PATCH and PUT
 
 class UserTestAPIView(APIView):
     permission_classes = [IsAuthenticated]

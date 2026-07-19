@@ -5,5 +5,15 @@ class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
         fields = '__all__'
+        read_only_fields = [
+            "employer",
+            "created_at",
+            "updated_at",
+        ]
 
+
+class JobStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ["status"]
     
