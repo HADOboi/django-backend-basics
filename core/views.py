@@ -2,19 +2,24 @@ from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
-from .models import Job
+from .models import Job, STATUS_ACTIVE
 from .serializers import JobSerializer, JobStatusSerializer
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from .filters import JobFilter
 
 class JobListAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     serializer_class = JobSerializer
-    queryset = Job.objects.select_related("employer")
+    queryset = (
+        Job.objects.filter(status="ACTIVE")
+        .select_related("employer")
+        .order_by("-created_at")
+    )
 
     filter_backends = [
         DjangoFilterBackend,
@@ -22,14 +27,12 @@ class JobListAPIView(generics.ListAPIView):
         OrderingFilter,
     ]
 
-    filterset_fields = [
-        "job_type",
-        "location",
-        "title",
-    ]
+    filterset_class = JobFilter
+
     search_fields = [
         "title",
         "description",
+        "skills",
         "location",
     ]
     ordering_fields = [
@@ -67,6 +70,29 @@ class JobStatusAPIView(generics.UpdateAPIView):
         )
 #no need PATCh endpoint here because UpdateAPIView already
 #knows how to use PATCH and PUT
+
+class FeaturedJobListAPIView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = JobSerializer
+
+    queryset = (
+        Job.objects.filter(
+            status="ACTIVE",
+            is_featured=True
+        )
+        .select_related("employer")
+        .order_by("-created_at")
+    )
+
+class LatestJobListAPIView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = JobSerializer
+
+    queryset = (
+        Job.objects.filter(status="ACTIVE")
+        .select_related("employer")
+        .order_by("-created_at")
+    )
 
 class UserTestAPIView(APIView):
     permission_classes = [IsAuthenticated]
