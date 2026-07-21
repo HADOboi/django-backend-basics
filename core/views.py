@@ -1,16 +1,71 @@
+from django.core.files.base import ContentFile
+
 from rest_framework.views import APIView
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
+from accounts.models import CandidateProfile
+
 from .permissions import IsEmployer, IsCandidate, IsAdmin
-from .models import Job, STATUS_ACTIVE
-from .serializers import JobSerializer, JobStatusSerializer
+from .models import Job, Application, STATUS_ACTIVE
+from .serializers import JobSerializer, JobStatusSerializer, ApplicationSerializer
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import JobFilter
+
+class ApplyJobAPIView(generics.CreateAPIView):
+    serializer_class = ApplicationSerializer
+    permission_classes = [IsCandidate]
+
+    def perform_create(self, serializer):
+        candidate = self.request.user.candidate_profile
+        job = serializer.validated_data["job"]
+
+        if job.status != STATUS_ACTIVE:
+            raise ValidationError(
+                {"job": "This job is no longer accepting applications."}
+            )
+
+        if Application.objects.filter(
+            candidate=candidate,
+            job=job,
+        ).exists():
+            raise ValidationError(
+                {"job": "You have already applied for this job."}
+            )
+
+        if not candidate.resume:
+            raise ValidationError(
+                {"resume": "Please upload your resume before applying."}
+            )
+
+        application = serializer.save(candidate=candidate)
+
+        candidate.resume.open("rb")
+
+        application.resume_snapshot.save(
+            candidate.resume.name.split("/")[-1],
+            ContentFile(candidate.resume.read()),
+            save=True,
+        )
+
+        candidate.resume.close()
+
+class CandidateApplicationListAPIView(generics.ListAPIView):
+    serializer_class = ApplicationSerializer
+    permission_classes = [IsCandidate]
+
+    def get_queryset(self):
+        return (
+            Application.objects.filter(
+                candidate=self.request.user.candidate_profile
+            )
+            .select_related("job")
+            .order_by("-applied_at")
+        )
 
 class JobListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]

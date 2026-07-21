@@ -81,9 +81,22 @@ class Application(models.Model):
         on_delete=models.CASCADE,
     )
     job = models.ForeignKey(Job, on_delete=models.CASCADE)
+    resume_snapshot = models.FileField(
+        upload_to="application_resumes/"
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
     applied_at = models.DateTimeField(auto_now_add=True)
     cover_letter = models.TextField()
+
+    class Meta:
+        ordering = ["-applied_at"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["candidate", "job"],
+                name="unique_candidate_job_application",
+            )
+        ]
 
     def __str__(self):
         return f"{self.candidate} -> {self.job}"
