@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import EmployerProfile, CandidateProfile
+from accounts.models import User
 
 JOB_FULL_TIME = "FULL_TIME"
 JOB_PART_TIME = "PART_TIME"
@@ -70,11 +71,36 @@ class Job(models.Model):
         return self.title
 
 class Application(models.Model):
+    STATUS_APPLIED = "APPLIED"
+    STATUS_SHORTLISTED = "SHORTLISTED"
+    STATUS_INTERVIEW = "INTERVIEW"
+    STATUS_REJECTED = "REJECTED"
+    STATUS_SELECTED = "SELECTED"
+
     STATUS_CHOICES = [
-        ("Pending", "Pending"),
-        ("Accepted", "Accepted"),
-        ("Rejected", "Rejected"),
+        (STATUS_APPLIED, "Applied"),
+        (STATUS_SHORTLISTED, "Shortlisted"),
+        (STATUS_INTERVIEW, "Interview Scheduled"),
+        (STATUS_REJECTED, "Rejected"),
+        (STATUS_SELECTED, "Selected"),
     ]
+
+    ALLOWED_STATUS_TRANSITIONS = {
+        STATUS_APPLIED: [
+            STATUS_SHORTLISTED,
+            STATUS_REJECTED,
+        ],
+        STATUS_SHORTLISTED: [
+            STATUS_INTERVIEW,
+            STATUS_REJECTED,
+        ],
+        STATUS_INTERVIEW: [
+            STATUS_SELECTED,
+            STATUS_REJECTED,
+        ],
+        STATUS_SELECTED: [],
+        STATUS_REJECTED: [],
+    }
 
     candidate = models.ForeignKey(
         CandidateProfile,
@@ -84,7 +110,11 @@ class Application(models.Model):
     resume_snapshot = models.FileField(
         upload_to="application_resumes/"
     )
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_APPLIED,
+    )
     applied_at = models.DateTimeField(auto_now_add=True)
     cover_letter = models.TextField()
 
@@ -100,3 +130,30 @@ class Application(models.Model):
 
     def __str__(self):
         return f"{self.candidate} -> {self.job}"
+
+class ApplicationStatusHistory(models.Model):
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+    )
+
+    old_status = models.CharField(max_length=30)
+
+    new_status = models.CharField(max_length=30)
+
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+    )
+
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-changed_at"]
+
+    def __str__(self):
+        return (
+            f"{self.application.id}: "
+            f"{self.old_status} -> {self.new_status}"
+        )

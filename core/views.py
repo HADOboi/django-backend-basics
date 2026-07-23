@@ -1,4 +1,5 @@
 from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
@@ -9,8 +10,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.models import CandidateProfile
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
-from .models import Job, Application, STATUS_ACTIVE
-from .serializers import JobSerializer, JobStatusSerializer, ApplicationSerializer
+from .models import Job, Application, ApplicationStatusHistory, STATUS_ACTIVE
+from .serializers import JobSerializer, JobStatusSerializer, ApplicationSerializer, ApplicationStatusSerializer, ApplicationStatusHistorySerializer, EmployerApplicationSerializer
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -64,6 +65,44 @@ class CandidateApplicationListAPIView(generics.ListAPIView):
                 candidate=self.request.user.candidate_profile
             )
             .select_related("job")
+            .order_by("-applied_at")
+        )
+
+class ApplicationStatusUpdateAPIView(generics.UpdateAPIView):
+    queryset = Application.objects.select_related("job", "candidate")
+    serializer_class = ApplicationStatusSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        application = self.get_object()
+
+        old_status = application.status
+
+        updated_application = serializer.save()
+
+        ApplicationStatusHistory.objects.create(
+            application=updated_application,
+            old_status=old_status,
+            new_status=updated_application.status,
+            changed_by=self.request.user,
+        )
+
+    def get_queryset(self):
+        return Application.objects.filter(
+            job__employer=self.request.user.employer_profile
+        )
+
+class EmployerApplicationListAPIView(generics.ListAPIView):
+    serializer_class = EmployerApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Application.objects
+            .select_related("candidate", "job")
+            .filter(
+                job__employer=self.request.user.employer_profile
+            )
             .order_by("-applied_at")
         )
 
@@ -148,6 +187,19 @@ class LatestJobListAPIView(generics.ListAPIView):
         .select_related("employer")
         .order_by("-created_at")
     )
+
+class ApplicationStatusHistoryAPIView(generics.ListAPIView):
+    serializer_class = ApplicationStatusHistorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        application = get_object_or_404(
+            Application,
+            pk=self.kwargs["pk"],
+            job__employer=self.request.user.employer_profile,
+        )
+
+        return application.status_history.all()
 
 class UserTestAPIView(APIView):
     permission_classes = [IsAuthenticated]
