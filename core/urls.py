@@ -11,6 +11,8 @@ from .views import (
     ApplicationStatusUpdateAPIView,
     EmployerApplicationListAPIView,
     ApplicationStatusHistoryAPIView,
+    EmployerJobListAPIView,
+    EmployerDashboardAPIView,
     UserTestAPIView,
 )
 
@@ -52,5 +54,13 @@ urlpatterns = [
     path(
         "applications/<int:pk>/history/",
         ApplicationStatusHistoryAPIView.as_view(),
+    ),
+    path(
+        "employer/jobs/",
+        EmployerJobListAPIView.as_view(),
+    ),
+    path(
+        "employer/dashboard/",
+        EmployerDashboardAPIView.as_view(),
     ),
 ]

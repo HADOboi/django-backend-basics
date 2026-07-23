@@ -1,5 +1,6 @@
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
+from django.db.models import Count
 
 from rest_framework.views import APIView
 from rest_framework import generics, status
@@ -96,15 +97,29 @@ class EmployerApplicationListAPIView(generics.ListAPIView):
     serializer_class = EmployerApplicationSerializer
     permission_classes = [IsAuthenticated]
 
+    filter_backends = [SearchFilter]
+
+    search_fields = [
+        "candidate__user__first_name",
+        "candidate__user__last_name",
+        "candidate__user__email",
+    ]
+
     def get_queryset(self):
-        return (
+        queryset = (
             Application.objects
             .select_related("candidate", "job")
             .filter(
                 job__employer=self.request.user.employer_profile
             )
-            .order_by("-applied_at")
         )
+
+        status = self.request.query_params.get("status")
+
+        if status:
+            queryset = queryset.filter(status=status)
+
+        return queryset.order_by("-applied_at")
 
 class JobListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
@@ -200,6 +215,66 @@ class ApplicationStatusHistoryAPIView(generics.ListAPIView):
         )
 
         return application.status_history.all()
+
+class EmployerJobListAPIView(generics.ListAPIView):
+    serializer_class = JobSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Job.objects.filter(
+                employer=self.request.user.employer_profile
+            )
+            .order_by("-created_at")
+        )
+
+class EmployerDashboardAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        employer = request.user.employer_profile
+
+        jobs = Job.objects.filter(employer=employer)
+
+        applications = Application.objects.filter(
+            job__employer=employer
+        )
+
+        total_applications = applications.count()
+
+        shortlisted = applications.filter(
+            status=Application.STATUS_SHORTLISTED
+        ).count()
+
+        if total_applications == 0:
+            shortlist_ratio = 0
+        else:
+            shortlist_ratio = round(
+                (shortlisted / total_applications) * 100,
+                2,
+            )
+
+        data = {
+            "total_jobs": jobs.count(),
+            "active_jobs": jobs.filter(status=STATUS_ACTIVE).count(),
+            "total_applications": total_applications,
+            "applied": applications.filter(
+                status=Application.STATUS_APPLIED
+            ).count(),
+            "shortlisted": shortlisted,
+            "shortlist_ratio": shortlist_ratio,
+            "interview": applications.filter(
+                status=Application.STATUS_INTERVIEW
+            ).count(),
+            "selected": applications.filter(
+                status=Application.STATUS_SELECTED
+            ).count(),
+            "rejected": applications.filter(
+                status=Application.STATUS_REJECTED
+            ).count(),
+        }
+
+        return Response(data)
 
 class UserTestAPIView(APIView):
     permission_classes = [IsAuthenticated]
