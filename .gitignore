@@ -23,3 +23,6 @@ Thumbs.db
 
 #tasks file
 tasks.txt
+
+#code backup
+*.zip

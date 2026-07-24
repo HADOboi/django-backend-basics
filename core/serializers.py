@@ -1,5 +1,10 @@
 from rest_framework import serializers
-from .models import Job, Application, ApplicationStatusHistory
+from .models import (
+    Job, 
+    Application, 
+    ApplicationStatusHistory,
+    SavedJob,
+)
 
 class JobSerializer(serializers.ModelSerializer):
     class Meta:
@@ -63,6 +68,27 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "resume_snapshot",
             "status",
             "applied_at",
+        ]
+
+class SavedJobSerializer(serializers.ModelSerializer):
+    job = JobSerializer(read_only=True)
+
+    class Meta:
+        model = SavedJob
+        fields = [
+            "id",
+            "job",
+            "saved_at",
+        ]
+
+class ApplicationStatusHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ApplicationStatusHistory
+        fields = [
+            "id",
+            "old_status",
+            "new_status",
+            "changed_at",
         ]
 
 class EmployerApplicationSerializer(serializers.ModelSerializer):

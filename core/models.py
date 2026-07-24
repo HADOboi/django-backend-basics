@@ -131,6 +131,34 @@ class Application(models.Model):
     def __str__(self):
         return f"{self.candidate} -> {self.job}"
 
+class SavedJob(models.Model):
+    candidate = models.ForeignKey(
+        CandidateProfile,
+        on_delete=models.CASCADE,
+        related_name="saved_jobs",
+    )
+
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.CASCADE,
+        related_name="saved_by_candidates",
+    )
+
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-saved_at"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["candidate", "job"],
+                name="unique_saved_job",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.candidate} saved {self.job}"
+
 class ApplicationStatusHistory(models.Model):
     application = models.ForeignKey(
         Application,

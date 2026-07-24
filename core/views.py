@@ -11,8 +11,22 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.models import CandidateProfile
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
-from .models import Job, Application, ApplicationStatusHistory, STATUS_ACTIVE
-from .serializers import JobSerializer, JobStatusSerializer, ApplicationSerializer, ApplicationStatusSerializer, ApplicationStatusHistorySerializer, EmployerApplicationSerializer
+from .models import (
+    Job, 
+    Application, 
+    ApplicationStatusHistory, 
+    SavedJob,
+    STATUS_ACTIVE,
+)
+from .serializers import (
+    JobSerializer, 
+    JobStatusSerializer, 
+    ApplicationSerializer, 
+    ApplicationStatusSerializer, 
+    ApplicationStatusHistorySerializer, 
+    SavedJobSerializer,
+    EmployerApplicationSerializer,
+)
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -92,6 +106,146 @@ class ApplicationStatusUpdateAPIView(generics.UpdateAPIView):
         return Application.objects.filter(
             job__employer=self.request.user.employer_profile
         )
+
+class SaveJobAPIView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated, IsCandidate]
+
+    def post(self, request, job_id):
+        candidate = request.user.candidate_profile
+        job = get_object_or_404(Job, id=job_id)
+
+        saved_job, created = SavedJob.objects.get_or_create(
+            candidate=candidate,
+            job=job,
+        )
+
+        if not created:
+            return Response(
+                {"message": "Job already saved."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {"message": "Job saved successfully."},
+            status=status.HTTP_201_CREATED,
+        )
+
+class SavedJobListAPIView(generics.ListAPIView):
+    serializer_class = SavedJobSerializer
+    permission_classes = [IsAuthenticated, IsCandidate]
+
+    def get_queryset(self):
+        return (
+            SavedJob.objects.filter(
+                candidate=self.request.user.candidate_profile
+            )
+            .select_related("job")
+            .order_by("-saved_at")
+        )
+
+class RemoveSavedJobAPIView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated, IsCandidate]
+
+    def delete(self, request, job_id):
+        candidate = request.user.candidate_profile
+
+        saved_job = get_object_or_404(
+            SavedJob,
+            candidate=candidate,
+            job_id=job_id,
+        )
+
+        saved_job.delete()
+
+        return Response(
+            {"message": "Job removed from saved jobs."},
+            status=status.HTTP_200_OK,
+        )
+
+class CandidateInterviewStatusAPIView(generics.ListAPIView):
+    serializer_class = ApplicationSerializer
+    permission_classes = [IsAuthenticated, IsCandidate]
+
+    def get_queryset(self):
+        return (
+            Application.objects.filter(
+                candidate=self.request.user.candidate_profile,
+                status__in=[
+                    Application.STATUS_SHORTLISTED,
+                    Application.STATUS_INTERVIEW,
+                    Application.STATUS_SELECTED,
+                ],
+            )
+            .select_related("job")
+            .order_by("-applied_at")
+        )
+
+class ApplicationTimelineAPIView(generics.ListAPIView):
+    serializer_class = ApplicationStatusHistorySerializer
+    permission_classes = [IsAuthenticated, IsCandidate]
+
+    def get_queryset(self):
+        application = get_object_or_404(
+            Application,
+            id=self.kwargs["application_id"],
+            candidate=self.request.user.candidate_profile,
+        )
+
+        return (
+            ApplicationStatusHistory.objects.filter(
+                application=application
+            )
+            .order_by("changed_at")
+        )
+
+class CandidateRecommendationAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsCandidate]
+
+    def get(self, request):
+        candidate = request.user.candidate_profile
+
+        candidate_skills = {
+            skill.strip().lower()
+            for skill in candidate.skills.split(",")
+            if skill.strip()
+        }
+
+        applied_job_ids = Application.objects.filter(
+            candidate=candidate
+        ).values_list("job_id", flat=True)
+
+        saved_job_ids = SavedJob.objects.filter(
+            candidate=candidate
+        ).values_list("job_id", flat=True)
+
+        jobs = Job.objects.filter(
+            status=STATUS_ACTIVE
+        ).exclude(
+            id__in=applied_job_ids
+        ).exclude(
+            id__in=saved_job_ids
+        )
+
+        recommended_jobs = []
+
+        for job in jobs:
+            job_skills = {
+                skill.strip().lower()
+                for skill in job.skills.split(",")
+                if skill.strip()
+            }
+
+            matched_skills = candidate_skills.intersection(job_skills)
+
+            if matched_skills:
+                recommended_jobs.append(job)
+
+        serializer = JobSerializer(
+            recommended_jobs,
+            many=True
+        )
+
+        return Response(serializer.data)
 
 class EmployerApplicationListAPIView(generics.ListAPIView):
     serializer_class = EmployerApplicationSerializer
