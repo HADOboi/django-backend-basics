@@ -20,6 +20,16 @@ from .views import (
     CandidateInterviewStatusAPIView,
     ApplicationTimelineAPIView,
     CandidateRecommendationAPIView,
+    AdminEmployerApprovalAPIView,
+    AdminBlockUserAPIView,
+    AdminUnblockUserAPIView,
+    AdminJobListAPIView,
+    AdminDeleteJobAPIView,
+    AdminFlagUserAPIView,
+    AdminPlatformStatsAPIView,
+    AdminUserGrowthAPIView,
+    AdminJobActivityAPIView,
+    AdminAuditLogAPIView,
 )
 
 urlpatterns = [
@@ -98,5 +108,45 @@ urlpatterns = [
         "candidate/recommendations/",
         CandidateRecommendationAPIView.as_view(),
         name="candidate-recommendations",
+    ),
+    path(
+        "admin/employers/<int:pk>/approve/",
+        AdminEmployerApprovalAPIView.as_view(),
+    ),
+    path(
+        "admin/users/<int:pk>/block/",
+        AdminBlockUserAPIView.as_view(),
+    ),
+    path(
+        "admin/users/<int:pk>/unblock/",
+        AdminUnblockUserAPIView.as_view(),
+    ),
+    path(
+        "admin/jobs/",
+        AdminJobListAPIView.as_view(),
+    ),
+    path(
+        "admin/jobs/<int:pk>/delete/",
+        AdminDeleteJobAPIView.as_view(),
+    ),
+    path(
+        "admin/users/<int:pk>/flag/",
+        AdminFlagUserAPIView.as_view(),
+    ),
+    path(
+        "admin/platform-stats/",
+        AdminPlatformStatsAPIView.as_view(),
+    ),
+    path(
+        "admin/user-growth/",
+        AdminUserGrowthAPIView.as_view(),
+    ),
+    path(
+        "admin/job-activity/",
+        AdminJobActivityAPIView.as_view(),
+    ),
+    path(
+        "admin/audit-logs/",
+        AdminAuditLogAPIView.as_view(),
     ),
 ]

@@ -185,3 +185,26 @@ class ApplicationStatusHistory(models.Model):
             f"{self.application.id}: "
             f"{self.old_status} -> {self.new_status}"
         )
+
+class AuditLog(models.Model):
+    admin = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+
+    action = models.CharField(max_length=255)
+
+    target = models.CharField(max_length=255)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return (
+            f"{self.admin.username} - "
+            f"{self.action} - "
+            f"{self.target}"
+        )

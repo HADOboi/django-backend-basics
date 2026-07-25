@@ -1,14 +1,15 @@
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
+from django.db.models.functions import TruncDate
 
 from rest_framework.views import APIView
-from rest_framework import generics, status
+from rest_framework import generics, status, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-from accounts.models import CandidateProfile
+from accounts.models import CandidateProfile, EmployerProfile, User
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
 from .models import (
@@ -16,6 +17,7 @@ from .models import (
     Application, 
     ApplicationStatusHistory, 
     SavedJob,
+    AuditLog,
     STATUS_ACTIVE,
 )
 from .serializers import (
@@ -31,6 +33,209 @@ from .serializers import (
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import JobFilter
+
+class AdminBlockUserAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+
+        if not user.is_active:
+            return Response(
+                {
+                    "message": "User is already blocked."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_active = False
+        user.save()
+
+        AuditLog.objects.create(
+            admin=request.user,
+            action="Blocked User",
+            target=user.email,
+        )
+
+        return Response(
+            {
+                "message": "User blocked successfully."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class AdminUnblockUserAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+
+        if user.is_active:
+            return Response(
+                {
+                    "message": "User is already active."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_active = True
+        user.save()
+
+        AuditLog.objects.create(
+            admin=request.user,
+            action="Unblocked User",
+            target=user.email,
+        )
+
+        return Response(
+            {
+                "message": "User unblocked successfully."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class AdminJobListAPIView(generics.ListAPIView):
+    serializer_class = JobSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return (
+            Job.objects.select_related("employer", "employer__user")
+            .order_by("-created_at")
+        )
+
+class AdminDeleteJobAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def delete(self, request, pk):
+        job = get_object_or_404(Job, pk=pk)
+
+        title = job.title
+
+        AuditLog.objects.create(
+            admin=request.user,
+            action="Deleted Job",
+            target=job.title,
+        )
+
+        job.delete()
+
+        return Response(
+            {
+                "message": f"Job '{title}' deleted successfully."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class AdminFlagUserAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+
+        if user.is_flagged:
+            return Response(
+                {
+                    "message": "User is already flagged."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_flagged = True
+        user.save()
+
+        AuditLog.objects.create(
+            admin=request.user,
+            action="Flagged User",
+            target=user.email,
+        )
+
+        return Response(
+            {
+                "message": "User flagged successfully."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class AdminPlatformStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        data = {
+            "total_users": User.objects.count(),
+            "total_employers": User.objects.filter(
+                role=User.ROLE_EMPLOYER
+            ).count(),
+            "total_candidates": User.objects.filter(
+                role=User.ROLE_CANDIDATE
+            ).count(),
+            "verified_employers": User.objects.filter(
+                role=User.ROLE_EMPLOYER,
+                employer_profile__is_verified=True,
+            ).count(),
+            "blocked_users": User.objects.filter(
+                is_active=False
+            ).count(),
+            "flagged_users": User.objects.filter(
+                is_flagged=True
+            ).count(),
+            "total_jobs": Job.objects.count(),
+            "total_applications": Application.objects.count(),
+        }
+
+        return Response(data)
+
+class AdminUserGrowthAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        growth = (
+            User.objects
+            .annotate(date=TruncDate("created_at"))
+            .values("date")
+            .annotate(users=Count("id"))
+            .order_by("date")
+        )
+
+        return Response(growth)
+
+class AdminJobActivityAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        jobs = (
+            Job.objects
+            .annotate(
+                application_count=Count("application")
+            )
+            .values(
+                "id",
+                "title",
+                "status",
+                "created_at",
+                "application_count",
+            )
+            .order_by("-created_at")
+        )
+
+        return Response(jobs)
+
+class AdminAuditLogAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        logs = (
+            AuditLog.objects.select_related("admin")
+            .values(
+                "id",
+                "admin__username",
+                "action",
+                "target",
+                "created_at",
+            )
+        )
+
+        return Response(logs)
 
 class ApplyJobAPIView(generics.CreateAPIView):
     serializer_class = ApplicationSerializer
@@ -310,8 +515,17 @@ class JobCreateAPIView(generics.CreateAPIView):
     permission_classes = [IsEmployer]
 
     def perform_create(self, serializer):
+        employer = self.request.user.employer_profile
+
+        if not employer.is_verified:
+            raise serializers.ValidationError(
+                {
+                    "detail": "Employer account is not verified."
+                }
+            )
+
         serializer.save(
-            employer=self.request.user.employer_profile
+            employer=employer
         )
 
 class JobUpdateAPIView(generics.UpdateAPIView):
@@ -429,6 +643,44 @@ class EmployerDashboardAPIView(APIView):
         }
 
         return Response(data)
+
+
+
+
+class AdminEmployerApprovalAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk):
+        employer = get_object_or_404(
+            EmployerProfile,
+            pk=pk,
+        )
+
+        if employer.is_verified:
+            return Response(
+                {
+                    "message": "Employer is already approved."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        employer.is_verified = True
+        employer.save()
+
+        AuditLog.objects.create(
+            admin=request.user,
+            action="Approved Employer",
+            target=employer.user.email,
+        )
+
+        return Response(
+            {
+                "message": "Employer approved successfully."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 
 class UserTestAPIView(APIView):
     permission_classes = [IsAuthenticated]
