@@ -10,6 +10,8 @@ from .models import CandidateProfile, EmployerProfile
 from .serializers import CandidateProfileSerializer, EmployerProfileSerializer, SignupSerializer
 from .services import (get_candidate_profile,get_employer_profile,)
 
+from .utils.resume_parser import extract_resume_text
+
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_EXTENSIONS = (".pdf", ".doc", ".docx")
 
@@ -140,7 +142,6 @@ class EmployerProfileAPIView(APIView):
             status=status.HTTP_200_OK
         )
 
-
 class ResumeUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -199,4 +200,37 @@ class ResumeUploadAPIView(APIView):
                 "resume": profile.resume.url,
             },
             status=status.HTTP_200_OK
+        )
+
+class ResumeParseAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = get_candidate_profile(request.user)
+
+        if not profile.resume:
+            return Response(
+                {
+                    "error": "No resume uploaded."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try: 
+            resume_text = extract_resume_text(profile.resume.path)
+
+        except ValueError as e:
+            return Response(
+                {
+                    "error": str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "message": "Resume parsed successfully.",
+                "parsed_text": resume_text,
+            },
+            status=status.HTTP_200_OK,
         )
