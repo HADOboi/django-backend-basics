@@ -10,7 +10,7 @@ from .models import CandidateProfile, EmployerProfile
 from .serializers import CandidateProfileSerializer, EmployerProfileSerializer, SignupSerializer
 from .services import (get_candidate_profile,get_employer_profile,)
 
-from .utils.resume_parser import extract_resume_text
+from .utils.resume_parser import parse_resume
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_EXTENSIONS = (".pdf", ".doc", ".docx")
@@ -217,7 +217,7 @@ class ResumeParseAPIView(APIView):
             )
 
         try: 
-            resume_text = extract_resume_text(profile.resume.path)
+            parsed_data = parse_resume(profile.resume.path)
 
         except ValueError as e:
             return Response(
@@ -230,7 +230,7 @@ class ResumeParseAPIView(APIView):
         return Response(
             {
                 "message": "Resume parsed successfully.",
-                "parsed_text": resume_text,
+                "data": parsed_data,
             },
             status=status.HTTP_200_OK,
         )
