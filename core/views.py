@@ -10,6 +10,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from accounts.models import CandidateProfile, EmployerProfile, User
+from accounts.utils.resume_parser import parse_resume
+from accounts.views import get_candidate_profile
+
+from .services.ats_service import generate_ats_score
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
 from .models import (
@@ -265,6 +269,15 @@ class ApplyJobAPIView(generics.CreateAPIView):
 
         application = serializer.save(candidate=candidate)
 
+        ats_result = generate_ats_score(
+            candidate,
+            job,
+        )
+
+        application.ats_score = ats_result["total_score"]
+
+        application.save(update_fields=["ats_score"])
+
         candidate.resume.open("rb")
 
         application.resume_snapshot.save(
@@ -480,6 +493,44 @@ class EmployerApplicationListAPIView(generics.ListAPIView):
 
         return queryset.order_by("-applied_at")
 
+class RankedCandidatesAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsEmployer]
+
+    def get(self, request, job_id):
+        job = get_object_or_404(
+            Job,
+            pk=job_id,
+            employer=request.user.employer_profile,
+        )
+
+        applications = (
+            Application.objects.filter(job=job)
+            .select_related(
+                "candidate",
+                "candidate__user",
+            )
+            .order_by("-ats_score", "-applied_at")
+        )
+
+        data = []
+
+        for index, application in enumerate(applications, start=1):
+            data.append({
+                "rank": index,
+                "candidate": application.candidate.user.get_full_name(),
+                "email": application.candidate.user.email,
+                "ats_score": application.ats_score,
+                "status": application.status,
+            })
+
+        return Response(
+            {
+                "job": job.title,
+                "candidates": data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class JobListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = JobSerializer
@@ -680,6 +731,35 @@ class AdminEmployerApprovalAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
+class ATSScoreAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, job_id):
+        profile = get_candidate_profile(request.user)
+
+        if not profile.resume:
+            return Response(
+                {
+                    "error": "No resume uploaded."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        job = get_object_or_404(Job, pk=job_id)
+
+        ats_score = generate_ats_score(
+            profile,
+            job,
+        )
+
+        return Response(
+            {
+                "message": "ATS score calculated successfully.",
+                "data": ats_score,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class UserTestAPIView(APIView):

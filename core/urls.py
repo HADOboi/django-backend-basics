@@ -30,6 +30,8 @@ from .views import (
     AdminUserGrowthAPIView,
     AdminJobActivityAPIView,
     AdminAuditLogAPIView,
+    ATSScoreAPIView,
+    RankedCandidatesAPIView,
 )
 
 urlpatterns = [
@@ -149,4 +151,14 @@ urlpatterns = [
         "admin/audit-logs/",
         AdminAuditLogAPIView.as_view(),
     ),
+    path(
+        "jobs/<int:job_id>/ats-score/",
+        ATSScoreAPIView.as_view(),
+        name="ats-score",
+    ),
+    path(
+    "employer/jobs/<int:job_id>/ranked-candidates/",
+    RankedCandidatesAPIView.as_view(),
+    name="ranked-candidates",
+),
 ]
