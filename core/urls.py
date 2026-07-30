@@ -32,6 +32,7 @@ from .views import (
     AdminAuditLogAPIView,
     ATSScoreAPIView,
     RankedCandidatesAPIView,
+    ApplicationAutomationAPIView,
 )
 
 urlpatterns = [
@@ -157,8 +158,13 @@ urlpatterns = [
         name="ats-score",
     ),
     path(
-    "employer/jobs/<int:job_id>/ranked-candidates/",
-    RankedCandidatesAPIView.as_view(),
-    name="ranked-candidates",
-),
+        "employer/jobs/<int:job_id>/ranked-candidates/",
+        RankedCandidatesAPIView.as_view(),
+        name="ranked-candidates",
+    ),
+    path(
+        "applications/<int:pk>/process/",
+        ApplicationAutomationAPIView.as_view(),
+        name="application-process",
+    ),
 ]

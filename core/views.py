@@ -14,6 +14,9 @@ from accounts.utils.resume_parser import parse_resume
 from accounts.views import get_candidate_profile
 
 from .services.ats_service import generate_ats_score
+from .services.shortlisting_service import auto_process_application
+from .services.notification_service import notify_application_status
+from .services.automation_service import process_application
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
 from .models import (
@@ -277,6 +280,8 @@ class ApplyJobAPIView(generics.CreateAPIView):
         application.ats_score = ats_result["total_score"]
 
         application.save(update_fields=["ats_score"])
+
+        process_application(application)
 
         candidate.resume.open("rb")
 
@@ -761,6 +766,45 @@ class ATSScoreAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class ApplicationAutomationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+
+        if not hasattr(request.user, "employer_profile"):
+            return Response(
+                {"detail": "Only employers can process applications."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        application = get_object_or_404(
+            Application.objects.select_related(
+                "job",
+                "candidate",
+            ),
+            pk=pk,
+            job__employer=request.user.employer_profile,
+        )
+
+        ats_result = generate_ats_score(
+            application.candidate,
+            application.job,
+        )
+
+        application.ats_score = ats_result["total_score"]
+        application.save(update_fields=["ats_score"])
+
+        process_application(application)
+
+        return Response(
+            {
+                "message": "Application processed successfully.",
+                "application_id": application.id,
+                "ats_score": application.ats_score,
+                "status": application.status,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 class UserTestAPIView(APIView):
     permission_classes = [IsAuthenticated]
