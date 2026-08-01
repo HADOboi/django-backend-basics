@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Application Submitted</title>
+</head>
+<body>
+
+    <h2>Application Submitted</h2>
+
+    <p>Hello {{ candidate.user.first_name|default:candidate.user.email }},</p>
+
+    <p>
+        Your application for
+        <strong>{{ job.title }}</strong>
+        has been submitted successfully.
+    </p>
+
+    <p>
+        We will notify you when your application status changes.
+    </p>
+
+    <p>Thank you.</p>
+
+</body>
+</html>

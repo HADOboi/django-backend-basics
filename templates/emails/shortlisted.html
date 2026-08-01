@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Application Shortlisted</title>
+</head>
+<body>
+
+    <h2>Congratulations!</h2>
+
+    <p>Hello {{ candidate.user.first_name|default:candidate.user.email }},</p>
+
+    <p>
+        Good news!
+        Your application for
+        <strong>{{ job.title }}</strong>
+        has been shortlisted.
+    </p>
+
+    <p>
+        The employer may contact you with the next steps.
+    </p>
+
+    <p>Best of luck!</p>
+
+</body>
+</html>

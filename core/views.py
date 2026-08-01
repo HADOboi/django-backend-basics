@@ -15,7 +15,8 @@ from accounts.views import get_candidate_profile
 
 from .services.ats_service import generate_ats_score
 from .services.shortlisting_service import auto_process_application
-from .services.notification_service import notify_application_status
+
+from .tasks import send_application_submitted_email_task
 from .services.automation_service import process_application
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
@@ -272,6 +273,8 @@ class ApplyJobAPIView(generics.CreateAPIView):
 
         application = serializer.save(candidate=candidate)
 
+        send_application_submitted_email_task.delay(application.id)
+        
         ats_result = generate_ats_score(
             candidate,
             job,
