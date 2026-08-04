@@ -67,6 +67,14 @@ class Job(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["job_type"]),
+            models.Index(fields=["location"]),
+            models.Index(fields=["created_at"]),
+        ]
+
     def __str__(self):
         return self.title
 
@@ -126,6 +134,13 @@ class Application(models.Model):
 
     class Meta:
         ordering = ["-applied_at"]
+
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["candidate"]),
+            models.Index(fields=["job"]),
+            models.Index(fields=["applied_at"]),
+        ]
 
         constraints = [
             models.UniqueConstraint(

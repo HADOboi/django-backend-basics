@@ -305,7 +305,11 @@ class CandidateApplicationListAPIView(generics.ListAPIView):
             Application.objects.filter(
                 candidate=self.request.user.candidate_profile
             )
-            .select_related("job")
+            .select_related(
+                "job",
+                "job__employer",
+                "job__employer__user",
+            )
             .order_by("-applied_at")
         )
 
@@ -365,7 +369,11 @@ class SavedJobListAPIView(generics.ListAPIView):
             SavedJob.objects.filter(
                 candidate=self.request.user.candidate_profile
             )
-            .select_related("job")
+            .select_related(
+                "job",
+                "job__employer",
+                "job__employer__user",
+            )
             .order_by("-saved_at")
         )
 
@@ -402,7 +410,11 @@ class CandidateInterviewStatusAPIView(generics.ListAPIView):
                     Application.STATUS_SELECTED,
                 ],
             )
-            .select_related("job")
+            .select_related(
+                "job",
+                "job__employer",
+                "job__employer__user",
+            )
             .order_by("-applied_at")
         )
 
@@ -488,7 +500,12 @@ class EmployerApplicationListAPIView(generics.ListAPIView):
     def get_queryset(self):
         queryset = (
             Application.objects
-            .select_related("candidate", "job")
+            .select_related(
+                "candidate",
+                "candidate__user", 
+                "job",
+                "job__employer",
+            )
             .filter(
                 job__employer=self.request.user.employer_profile
             )
@@ -652,6 +669,7 @@ class EmployerJobListAPIView(generics.ListAPIView):
             Job.objects.filter(
                 employer=self.request.user.employer_profile
             )
+            .select_related("employer", "employer__user")
             .order_by("-created_at")
         )
 
