@@ -14,15 +14,14 @@ from core.services.notification_service import (
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
-def send_application_submitted_email_task(
-        application,
-        task_id=None,
-    ):
+def send_application_submitted_email_task(self, application_id):
     application = Application.objects.get(pk=application_id)
+
     send_application_submitted_email(
         application,
         task_id=self.request.id,
     )
+
     return f"Email sent for application {application.id}"
 
 @shared_task(
