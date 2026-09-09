@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent 
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -176,3 +176,12 @@ CELERY_TIMEZONE = "Asia/Kolkata"
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "process-pending-applications": {
+        "task": "core.tasks.process_pending_applications_task",
+        "schedule": crontab(minute="*/10"),
+    },
+}

@@ -26,3 +26,4 @@ tasks.txt
 
 #code backup
 *.zip
+celerybeat-schedule*

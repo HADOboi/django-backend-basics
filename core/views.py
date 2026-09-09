@@ -16,24 +16,27 @@ from accounts.views import get_candidate_profile
 from .services.ats_service import generate_ats_score
 from .services.shortlisting_service import auto_process_application
 
-from .tasks import send_application_submitted_email_task
+from .tasks import (
+    send_application_submitted_email_task,
+    generate_ats_score_task,
+)
 from .services.automation_service import process_application
 
 from .permissions import IsEmployer, IsCandidate, IsAdmin
 from .models import (
-    Job, 
-    Application, 
-    ApplicationStatusHistory, 
+    Job,
+    Application,
+    ApplicationStatusHistory,
     SavedJob,
     AuditLog,
     STATUS_ACTIVE,
 )
 from .serializers import (
-    JobSerializer, 
-    JobStatusSerializer, 
-    ApplicationSerializer, 
-    ApplicationStatusSerializer, 
-    ApplicationStatusHistorySerializer, 
+    JobSerializer,
+    JobStatusSerializer,
+    ApplicationSerializer,
+    ApplicationStatusSerializer,
+    ApplicationStatusHistorySerializer,
     SavedJobSerializer,
     EmployerApplicationSerializer,
 )
@@ -274,7 +277,7 @@ class ApplyJobAPIView(generics.CreateAPIView):
         application = serializer.save(candidate=candidate)
 
         send_application_submitted_email_task.delay(application.id)
-        
+
         ats_result = generate_ats_score(
             candidate,
             job,
@@ -502,7 +505,7 @@ class EmployerApplicationListAPIView(generics.ListAPIView):
             Application.objects
             .select_related(
                 "candidate",
-                "candidate__user", 
+                "candidate__user",
                 "job",
                 "job__employer",
             )
@@ -807,15 +810,7 @@ class ApplicationAutomationAPIView(APIView):
             job__employer=request.user.employer_profile,
         )
 
-        ats_result = generate_ats_score(
-            application.candidate,
-            application.job,
-        )
-
-        application.ats_score = ats_result["total_score"]
-        application.save(update_fields=["ats_score"])
-
-        process_application(application)
+        generate_ats_score_task.delay(application.id)
 
         return Response(
             {
