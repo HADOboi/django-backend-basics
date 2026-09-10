@@ -110,6 +110,18 @@ class Application(models.Model):
         STATUS_REJECTED: [],
     }
 
+    AI_CALL_QUEUED = "QUEUED"
+    AI_CALL_IN_PROGRESS = "IN_PROGRESS"
+    AI_CALL_COMPLETED = "COMPLETED"
+    AI_CALL_FAILED = "FAILED"
+
+    AI_CALL_STATUS_CHOICES = [
+        (AI_CALL_QUEUED, "Queued"),
+        (AI_CALL_IN_PROGRESS, "In Progress"),
+        (AI_CALL_COMPLETED, "Completed"),
+        (AI_CALL_FAILED, "Failed"),
+    ]
+
     candidate = models.ForeignKey(
         CandidateProfile,
         on_delete=models.CASCADE,
@@ -130,6 +142,18 @@ class Application(models.Model):
         max_digits=5,
         decimal_places=2,
         default=0,
+    )
+
+    ai_call_status = models.CharField(
+        max_length=20,
+        choices=AI_CALL_STATUS_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    ai_call_scheduled_at = models.DateTimeField(
+        null=True,
+        blank=True,
     )
 
     class Meta:

@@ -4,6 +4,7 @@ from core.services.notification_service import notify_application_status
 from core.tasks import (
     send_shortlisted_email_task,
     send_rejected_email_task,
+    trigger_ai_processing_task,
 )
 from core.services.eligibility_service import is_application_eligible
 from core.models import Application
@@ -20,6 +21,9 @@ def process_application(application):
     if application.status != new_status:
         application.status = new_status
         application.save(update_fields=["status"])
+
+        if application.status == Application.STATUS_SHORTLISTED:
+            trigger_ai_processing_task.delay(application.id)
 
         notify_application_status(application)
 

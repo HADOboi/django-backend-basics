@@ -125,7 +125,7 @@ SIMPLE_JWT = {
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
@@ -182,6 +182,10 @@ from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     "process-pending-applications": {
         "task": "core.tasks.process_pending_applications_task",
+        "schedule": crontab(minute="*/10"),
+    },
+    "process-queued-ai-calls": {
+        "task": "core.tasks.process_queued_ai_calls",
         "schedule": crontab(minute="*/10"),
     },
 }
