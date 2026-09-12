@@ -315,3 +315,155 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"{self.subject} -> {self.recipient}"
+
+class AIInterviewSession(models.Model):
+    STATUS_ACTIVE = "ACTIVE"
+    STATUS_COMPLETED = "COMPLETED"
+    STATUS_FAILED = "FAILED"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="ai_interview_sessions",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+    )
+
+    started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"AI Interview Session #{self.id}"
+
+
+class AIQuestion(models.Model):
+    session = models.ForeignKey(
+        AIInterviewSession,
+        on_delete=models.CASCADE,
+        related_name="questions",
+    )
+
+    question_text = models.TextField()
+
+    question_order = models.PositiveIntegerField()
+
+    asked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["question_order"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "question_order"],
+                name="unique_session_question_order",
+            )
+        ]
+
+    def __str__(self):
+        return f"Question {self.question_order} - Session #{self.session_id}"
+
+
+class AIAnswer(models.Model):
+    question = models.OneToOneField(
+        AIQuestion,
+        on_delete=models.CASCADE,
+        related_name="answer",
+    )
+
+    transcript = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    answered_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Answer - Question #{self.question_id}"
+
+
+class CallLog(models.Model):
+    CALL_INITIATED = "INITIATED"
+    CALL_ANSWERED = "ANSWERED"
+    CALL_MISSED = "MISSED"
+    CALL_FAILED = "FAILED"
+    CALL_COMPLETED = "COMPLETED"
+
+    STATUS_CHOICES = [
+        (CALL_INITIATED, "Initiated"),
+        (CALL_ANSWERED, "Answered"),
+        (CALL_MISSED, "Missed"),
+        (CALL_FAILED, "Failed"),
+        (CALL_COMPLETED, "Completed"),
+    ]
+
+    session = models.ForeignKey(
+        AIInterviewSession,
+        on_delete=models.CASCADE,
+        related_name="call_logs",
+    )
+
+    triggered_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_call_logs",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=CALL_INITIATED,
+    )
+
+    trigger_reason = models.TextField()
+
+    started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Call Log #{self.id} - Session #{self.session_id}"

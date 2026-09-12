@@ -10,7 +10,14 @@ from accounts.models import (
     CandidateProfile,
 )
 
-from .models import Job, Application
+from .models import (
+    Job,
+    Application,
+    AIInterviewSession,
+    AIQuestion,
+    AIAnswer,
+    CallLog,
+)
 
 class JobFlowTests(APITestCase):
     def setUp(self):
@@ -144,7 +151,7 @@ class JobFlowTests(APITestCase):
         )
 
         self.assertEqual(Job.objects.count(), 0)
-    
+
     def test_public_job_list(self):
         Job.objects.create(
             employer=self.employer_profile,
@@ -300,3 +307,103 @@ class JobFlowTests(APITestCase):
             Application.objects.count(),
             1,
         )
+
+class AIConversationStorageTests(TestCase):
+    def setUp(self):
+        self.employer_user = User.objects.create_user(
+            username="ai_employer",
+            email="ai_employer@test.com",
+            phone="9876543220",
+            password="TestPass123!",
+            role="EMPLOYER",
+        )
+
+        self.employer_profile = self.employer_user.employer_profile
+
+        self.candidate_user = User.objects.create_user(
+            username="ai_candidate",
+            email="ai_candidate@test.com",
+            phone="9876543221",
+            password="TestPass123!",
+            role="CANDIDATE",
+        )
+
+        self.candidate_profile = self.candidate_user.candidate_profile
+
+        self.job = Job.objects.create(
+            employer=self.employer_profile,
+            title="UI Developer",
+            description="UI Developer role",
+            skills="HTML,CSS,JavaScript",
+            experience=2,
+            salary_min=30000,
+            salary_max=50000,
+            location="Kochi",
+            job_type="FULL_TIME",
+        )
+
+        self.application = Application.objects.create(
+            candidate=self.candidate_profile,
+            job=self.job,
+            cover_letter="Interested in the role.",
+        )
+
+    def test_ai_interview_session_belongs_to_application(self):
+        session = AIInterviewSession.objects.create(
+            application=self.application,
+        )
+
+        self.assertEqual(session.application, self.application)
+
+    def test_question_and_answer_relationship(self):
+        session = AIInterviewSession.objects.create(
+            application=self.application,
+        )
+
+        question = AIQuestion.objects.create(
+            session=session,
+            question_text="Tell me about your UI development experience.",
+            question_order=1,
+        )
+
+        transcript = {
+            "text": "I have two years of UI development experience.",
+            "language": "en",
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 3.0,
+                    "text": "I have two years of UI development experience.",
+                }
+            ],
+        }
+
+        answer = AIAnswer.objects.create(
+            question=question,
+            transcript=transcript,
+        )
+
+        self.assertEqual(question.session, session)
+        self.assertEqual(question.answer, answer)
+        self.assertEqual(answer.transcript, transcript)
+
+    def test_call_log_stores_audit_information(self):
+        session = AIInterviewSession.objects.create(
+            application=self.application,
+        )
+
+        call_log = CallLog.objects.create(
+            session=session,
+            triggered_by=self.employer_user,
+            status=CallLog.CALL_INITIATED,
+            trigger_reason="Candidate was shortlisted.",
+        )
+
+        self.assertEqual(call_log.session, session)
+        self.assertEqual(call_log.triggered_by, self.employer_user)
+        self.assertEqual(call_log.status, CallLog.CALL_INITIATED)
+        self.assertEqual(
+            call_log.trigger_reason,
+            "Candidate was shortlisted.",
+        )
+        self.assertIsNotNone(call_log.created_at)

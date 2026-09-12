@@ -17,5 +17,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "django-stubs>=6.1.0",
     "locust==2.46.5",
 ]
