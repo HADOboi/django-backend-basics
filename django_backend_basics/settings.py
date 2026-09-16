@@ -8,6 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
+AI_API_KEY = os.getenv("AI_API_KEY")
+AI_API_BASE_URL = os.getenv("AI_API_BASE_URL")
+AI_FALLBACK_API_BASE_URL = os.getenv("AI_FALLBACK_API_BASE_URL")
+AI_FALLBACK_API_KEY = os.getenv("AI_FALLBACK_API_KEY")
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-0)^$y83=q44sa@7_o-*s!k5ln_6_9ab0@bco2ila$ycnjw=7@r'
 

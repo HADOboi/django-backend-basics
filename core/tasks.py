@@ -9,6 +9,8 @@ from core.services.notification_service import (
 
 from core.services.ats_service import generate_ats_score
 
+from core.services.ai_bridge_service import AIBridgeService
+
 @shared_task(
     bind=True,
     autoretry_for=(Exception,),
@@ -104,17 +106,41 @@ def trigger_ai_processing_task(self, application_id):
     application.ai_call_status = Application.AI_CALL_IN_PROGRESS
     application.save(update_fields=["ai_call_status"])
 
-    # Placeholder for future AI/LLM call integration.
-    application.ai_call_status = Application.AI_CALL_COMPLETED
-    application.ai_call_scheduled_at = timezone.now()
-    application.save(
-        update_fields=[
-            "ai_call_status",
-            "ai_call_scheduled_at",
-        ]
-    )
+    try:
+        bridge = AIBridgeService()
 
-    return f"AI call completed for application {application.id}"
+        voice_id = bridge.select_voice(
+            gender="female",
+            language="en",
+        )
+
+        bridge.trigger_outbound_call(
+            phone_number=application.candidate.phone_number,
+            voice_id=voice_id,
+            language="en",
+            script=(
+                f"Hello {application.candidate.first_name}, "
+                f"this is an AI screening call regarding the "
+                f"{application.job.title} position."
+            ),
+        )
+
+        application.ai_call_status = Application.AI_CALL_COMPLETED
+        application.ai_call_scheduled_at = timezone.now()
+        application.save(
+            update_fields=[
+                "ai_call_status",
+                "ai_call_scheduled_at",
+            ]
+        )
+
+        return f"AI call completed for application {application.id}"
+
+    except Exception as error:
+        application.ai_call_status = Application.AI_CALL_FAILED
+        application.save(update_fields=["ai_call_status"])
+
+        return f"AI call failed for application {application.id}: {error}"
 
 @shared_task
 def process_queued_ai_calls():
